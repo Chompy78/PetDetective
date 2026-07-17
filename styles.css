@@ -380,6 +380,11 @@ body {
   font-size: 0.85rem;
 }
 
+.headline-item {
+  font-weight: bold;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
 .companion-chip {
   display: inline-block;
   background: #f3e8ff;

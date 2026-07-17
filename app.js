@@ -60,6 +60,31 @@ const PERSONALITY_TIPS = {
   'Royal': 'Elegant and particular — check the library, plaza or a grand house.'
 };
 
+const HEADLINE_TEMPLATES = {
+  Common: [
+    (pet, loc) => `Local Hero Finds ${pet.name} Near ${loc}`,
+    (pet, loc) => `${pet.name} the ${pet.species} Back Home Safe`
+  ],
+  Rare: [
+    (pet, loc) => `Rare ${pet.species} ${pet.name} Rescued in Dramatic Search at ${loc}!`,
+    (pet, loc) => `Town Cheers as ${pet.name} Returns From ${loc} Adventure`
+  ],
+  Epic: [
+    (pet, loc) => `EPIC RESCUE: ${pet.name} the ${pet.species} Found at ${loc}!`,
+    (pet, loc) => `Detective Agency Pulls Off Stunning Save of ${pet.name}!`
+  ],
+  Legendary: [
+    (pet, loc) => `LEGENDARY! ${pet.name} the ${pet.species} Returns Home — Town Celebrates!`,
+    (pet, loc) => `HISTORIC RESCUE: ${pet.name} Found at ${loc}, Detective Agency Makes Headlines!`
+  ]
+};
+
+function generateHeadline(pet, loc) {
+  const templates = HEADLINE_TEMPLATES[pet.rarity] || HEADLINE_TEMPLATES.Common;
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  return template(pet, loc);
+}
+
 const THANK_YOU_TEMPLATES = [
   (owner, pet) => `"Thank you for finding ${pet.name}!" says ${owner.name}, who ${owner.blurb}.`,
   (owner, pet) => `${owner.name} wipes away a happy tear: "I can't thank you enough for bringing ${pet.name} home."`,
@@ -108,6 +133,7 @@ const defaultState = {
   rescued: [],
   records: [],
   photos: [],
+  headlines: [],
   companions: [],
   tab: 'map',
   lastPetName: null,
@@ -369,6 +395,8 @@ function investigate(id) {
     state.rescued.push(record);
     state.records.push(`Case ${state.caseNumber}: ${pet.name} the ${pet.species} was found at ${loc} on day ${state.day}. Personality clue: ${pet.personality}.`);
     state.photos.push(record.photo);
+    state.headlines.unshift(generateHeadline(pet, loc));
+    if (state.headlines.length > 20) state.headlines.length = 20;
     if (newCompanion) {
       state.companions.push(pet.name);
     }
@@ -631,6 +659,7 @@ function collectionHtml() {
     </div>
   `).join('') : `<div class="item">No pet cards yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
   const photos = state.photos.length ? [...state.photos].reverse().map(p => `<div class="photo-chip">${p}</div>`).join('') : '<div class="item">No photos yet.</div>';
+  const headlines = state.headlines.length ? state.headlines.map(h => `<div class="item headline-item">${h}</div>`).join('') : '<div class="item">No headlines yet — solve a case to make the news.</div>';
   return `
     <section class="card">
       <h2>⭐ Pet Collection</h2>
@@ -638,6 +667,8 @@ function collectionHtml() {
       <div class="collection-grid">${cards}</div>
       <h3 style="margin-top:16px">📸 Photo Album</h3>
       <div class="photo-grid">${photos}</div>
+      <h3 style="margin-top:16px">📰 Newspaper</h3>
+      <div class="list">${headlines}</div>
     </section>
   `;
 }

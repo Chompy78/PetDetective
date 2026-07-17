@@ -42,20 +42,6 @@ display room" view distinct from the working Collection tab.
 **Done when:** the new tab renders correctly with zero rescues (empty state) and after several rescues
 across rarities.
 
-## Newspaper headlines — TODO
-Branch `feat/newspaper-headlines`. Generate a cute headline on each solve, especially for Epic/Legendary
-rescues, and keep a small archive.
-**Effort:** low · **Risk:** low — additive array in `state`, no shape risk, no game-logic branching.
-
-```text
-- Add a headline-template array (tone varies by rarity) similar to NO_SIGN_TEMPLATES.
-- On solve, push a generated headline to `state.headlines` (new array, default `[]`).
-- Display recent headlines somewhere visible (Collection tab or its own small section).
-```
-
-**Done when:** solving a case appends a headline visible in the UI, and Legendary/Epic solves read
-noticeably more dramatic than Common ones.
-
 ## 🟢 LATER
 
 ## Personality-driven movement — TODO
