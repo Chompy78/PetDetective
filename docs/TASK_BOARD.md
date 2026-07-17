@@ -12,20 +12,7 @@ _(empty — nothing currently in flight)_
 
 ## 🟡 NEXT
 
-## Pet HQ trophy room — TODO
-Branch `feat/trophy-room`. New display combining rescued cards, photos, and companions into one "HQ
-display room" view distinct from the working Collection tab.
-**Effort:** medium · **Risk:** low — purely additive UI/tab, reuses existing `state.rescued`/`photos`/
-`companions`, no game-logic changes.
-
-```text
-- Add a new tab (e.g. "🏆 HQ") alongside Map/Notebook/Collection/Agency/Tasks.
-- Render a showcase layout: top rarities first, companions highlighted, photo strip.
-- Reuse existing rarity/companion helpers (`rarityClass`, `companionIcon`) — don't duplicate logic.
-```
-
-**Done when:** the new tab renders correctly with zero rescues (empty state) and after several rescues
-across rarities.
+_(empty — all four caught up in this sweep; see `⏸️ ON HOLD` for more ideas to promote)_
 
 ## 🟢 LATER
 

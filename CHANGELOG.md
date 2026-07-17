@@ -2,6 +2,8 @@
 
 One line per shipped change, newest on top.
 
+- 2026-07-17 — feat: Pet HQ trophy room — a new tab showcasing rescued pets by rarity, companions, and a
+  photo strip.
 - 2026-07-17 — feat: detective theories & predictions — a free-text notebook field, persisted per active
   case and cleared on a new case, with player input HTML-escaped before rendering.
 - 2026-07-17 — feat: newspaper headlines — a rarity-scaled headline archive shown in the Collection tab

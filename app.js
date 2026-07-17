@@ -97,6 +97,8 @@ const NO_SIGN_TEMPLATES = [
   (pet, loc, locInfo) => `${loc} is quiet today — just ${locInfo.clue}. Doesn't seem like the kind of place a ${pet.personality.toLowerCase()} pet would choose... or does it?`
 ];
 
+const RARITY_RANK = { Legendary: 4, Epic: 3, Rare: 2, Common: 1 };
+
 const REPUTATION_TIERS = [
   { name: 'Junior Detective', min: 0 },
   { name: 'Local Detective', min: 100 },
@@ -613,6 +615,7 @@ function tabsHtml() {
     ['map', '🗺️ Map', 'Map', false],
     ['notebook', '📓 Notebook', 'Notebook', false],
     ['collection', '⭐ Collection', 'Collection', hasNewCollection],
+    ['hq', '🏆 HQ', 'HQ', false],
     ['agency', '🏢 Agency', 'Agency', hasNewAgency],
     ['tasks', '✅ Task List', 'Task List', false]
   ];
@@ -701,6 +704,44 @@ function collectionHtml() {
   `;
 }
 
+function hqHtml() {
+  if (!state.rescued.length) {
+    return `
+      <section class="card">
+        <h2>🏆 HQ Display Room</h2>
+        <p>Nothing on display yet — solve your first case to start filling the trophy shelf.</p>
+      </section>
+    `;
+  }
+  const topRescues = [...state.rescued].sort((a, b) => (RARITY_RANK[b.rarity] || 0) - (RARITY_RANK[a.rarity] || 0));
+  const trophyCards = topRescues.map(p => `
+    <div class="pet-card trophy-card">
+      <div class="big">${p.icon}</div>
+      <b>${p.name}</b>
+      <span class="rarity-badge ${rarityClass(p.rarity)}">${p.rarity}</span>
+      <br><span>Found at ${p.foundAt}</span>
+    </div>
+  `).join('');
+  const companionRow = state.companions.length
+    ? state.companions.map(name => `<span class="companion-chip">${companionIcon(name)} ${name}</span>`).join('')
+    : '<span class="item">No companions yet — rescue an Epic or Legendary pet.</span>';
+  const photoStrip = state.photos.length
+    ? [...state.photos].reverse().map(p => `<div class="photo-chip">${p}</div>`).join('')
+    : '<div class="item">No photos yet.</div>';
+  return `
+    <section class="card">
+      <h2>🏆 HQ Display Room</h2>
+      <p>Your agency's proudest moments, on display for every visitor to see.</p>
+      <h3 style="margin-top:16px">🏅 Trophy Shelf</h3>
+      <div class="collection-grid">${trophyCards}</div>
+      <h3 style="margin-top:16px">🐾 Companions</h3>
+      <div class="companion-row">${companionRow}</div>
+      <h3 style="margin-top:16px">📸 Photo Strip</h3>
+      <div class="photo-grid">${photoStrip}</div>
+    </section>
+  `;
+}
+
 function agencyHtml() {
   const level = AGENCY_LEVELS[state.agencyLevel];
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
@@ -773,6 +814,7 @@ function mainHtml() {
   let content = mapHtml();
   if (state.tab === 'notebook') content = notebookHtml();
   if (state.tab === 'collection') content = collectionHtml();
+  if (state.tab === 'hq') content = hqHtml();
   if (state.tab === 'agency') content = agencyHtml();
   if (state.tab === 'tasks') content = tasksHtml();
   return `
