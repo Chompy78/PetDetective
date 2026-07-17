@@ -15,8 +15,8 @@ directly to the repo's current branch — no branch, no PR (this is a docs-only 
 ## Step 1 — read live context
 
 Read `AGENTS.md`, `docs/TASK_BOARD.md`, and `DECISIONS.md` first. Use them for: architecture rules, the
-existing NOW/NEXT/LATER buckets and their tasks, branch naming (`type/short-slug`), and the decision-ID
-format (`D-<YYYY-MM-DD>-<branch-slug>`, no lookup needed).
+existing NOW/NEXT/LATER/ON HOLD buckets and their tasks, branch naming (`type/short-slug`), and the
+decision-ID format (`D-<YYYY-MM-DD>-<branch-slug>`, no lookup needed).
 
 Do **not** confuse `docs/TASK_BOARD.md` (engineering roadmap) with `TASKS.md` at the repo root (in-game
 design content, rendered via `DESIGN_TASKS` in `app.js`) — never touch the latter from this skill.
@@ -66,7 +66,9 @@ factor(s) in the one-clause "why".
   `loadState` if migration is feasible."*
 - Branch naming: `type/short-slug`.
 - If it warrants a `DECISIONS.md` entry: `D-<YYYY-MM-DD>-<branch-slug>`.
-- Bucket: 🔴 NOW = urgent · 🟡 NEXT = build work / default · 🟢 LATER = idea / low priority.
+- Bucket: 🔴 NOW = urgent · 🟡 NEXT = build work / default · 🟢 LATER = idea / low priority · ⏸️ ON HOLD =
+  explicitly parked, never picked by `/pick-task` or `/sweep-tasks`. Only place a new task here if the user
+  explicitly asks to park it — never default a new task into this bucket.
 
 After formatting, **show the task block and ask for approval before doing anything else.** Wait for
 confirmation. If changes are requested, revise and show again.

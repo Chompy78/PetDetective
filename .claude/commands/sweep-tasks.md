@@ -12,6 +12,10 @@ eligible, say so plainly and stop — that's a legitimate outcome, not a failure
 **Requires `/add-task`'s Effort/Risk tags.** A task with no Effort/Risk line, or `Risk: high`, is never
 eligible, no matter how low Effort is — Risk is the only safety gate, `high` is an absolute veto.
 
+**`⏸️ ON HOLD` is entirely out of scope for this skill, full stop.** Tasks parked there are excluded before
+the Risk filter even applies, regardless of their Effort/Risk tags — they must never appear in the
+candidate queue, the eligible list, or the final report's "eligible" counts.
+
 **Merge-as-you-go** is this skill's fixed behavior — every PR it opens gets merged once checks pass, no
 per-run prompt. Since this repo has a single branch, "merge" here just means merging the PR into that
 branch — there's no separate staging→production promotion step to manage.
@@ -25,12 +29,15 @@ git show origin/<default-branch>:AGENTS.md
 git show origin/<default-branch>:docs/TASK_BOARD.md
 ```
 Return the branch-naming convention and every `— TODO` task in NOW/NEXT/LATER verbatim, including each
-one's Effort/Risk tag line (state plainly which tasks have none).
+one's Effort/Risk tag line (state plainly which tasks have none). **Do not read tasks under `⏸️ ON HOLD`
+into this list at all** — that bucket is never in scope for this skill.
 
 ## Step 2 — build the eligible queue
 
-Filter to `Risk: low` or `Risk: medium`. Untagged tasks are excluded — list them in the final report, don't
-guess a rating for them. Order: priority first (NOW → NEXT → LATER), then Effort ascending as a tiebreak.
+Start from NOW/NEXT/LATER tasks only — `⏸️ ON HOLD` was already excluded in Step 1 and must not resurface
+here. Filter to `Risk: low` or `Risk: medium`. Untagged tasks are excluded — list them in the final report,
+don't guess a rating for them. Order: priority first (NOW → NEXT → LATER), then Effort ascending as a
+tiebreak.
 
 **Batch size:** use `$ARGUMENTS` as the cap only if it's a bare positive integer. Otherwise ask once via
 `AskUserQuestion` — recommended default 3-5 given this repo's size — before doing anything else. This is

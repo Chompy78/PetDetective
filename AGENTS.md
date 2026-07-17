@@ -10,6 +10,10 @@ static file server for testing (service workers require `http://`, not `file://`
 ## Active Priorities
 - **Current focus:** see `docs/TASK_BOARD.md` for open engineering work. This is a fresh scaffold — the
   board starts empty; fold in real priorities as they come up.
+- **`docs/TASK_BOARD.md` has four buckets, not three:** 🔴 NOW / 🟡 NEXT / 🟢 LATER (normal, pickable work)
+  plus **⏸️ ON HOLD** — ideas intentionally parked and excluded from `/pick-task` and `/sweep-tasks` by
+  explicit instruction in each of those skills. Promote a task out of ON HOLD by moving its whole block into
+  NOW/NEXT/LATER; never treat an ON HOLD task as available just because it's formatted like the others.
 - **Do not confuse `TASKS.md` with the engineering roadmap.** `TASKS.md` (repo root) is **game content** —
   it's the design-ideas list shown in-app under the "✅ Task List" tab, backed by the `DESIGN_TASKS` const
   in `app.js`. The engineering roadmap lives in `docs/TASK_BOARD.md` instead. Don't merge these two files.
