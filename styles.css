@@ -44,6 +44,43 @@ body {
   gap: 8px;
 }
 
+.hero-progress-wrap {
+  flex-basis: 100%;
+  margin-top: 6px;
+}
+
+.progress-track {
+  background: #fde2b3;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-caption {
+  font-size: 0.75rem;
+  color: #92400e;
+  margin-top: 4px;
+}
+
+.hero-progress-track {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.hero-progress-fill {
+  background: #fff;
+}
+
+.hero-progress-caption {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .pill {
   background: rgba(255, 255, 255, 0.9);
   color: #92400e;
@@ -94,6 +131,26 @@ body {
 .safety {
   margin-top: 6px;
 }
+
+.safety-hint {
+  font-size: 0.75rem;
+  color: #92400e;
+  margin-top: 2px;
+}
+
+.rarity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.rarity-common { background: #9ca3af; }
+.rarity-rare { background: #3b82f6; }
+.rarity-epic { background: #a855f7; }
+.rarity-legendary { background: linear-gradient(135deg, #f59e0b, #eab308); }
 
 .actions {
   display: flex;
@@ -148,6 +205,16 @@ body {
   border-color: #f59e0b;
 }
 
+.tab-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 .map-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -181,6 +248,19 @@ body {
 .location .hint {
   font-size: 0.75rem;
   color: #92400e;
+}
+
+.location.visited {
+  opacity: 0.55;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.visited-badge {
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #16a34a;
+  margin-bottom: 2px;
 }
 
 .log {
@@ -242,4 +322,91 @@ body {
   .layout {
     grid-template-columns: 1fr;
   }
+}
+
+.celebration-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 44, 20, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.celebration-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.15);
+  position: relative;
+  border-top: 6px solid #f59e0b;
+  animation: pop-in 0.25s ease;
+}
+
+.celebration-card.rarity-common { border-top-color: #9ca3af; }
+.celebration-card.rarity-rare { border-top-color: #3b82f6; }
+.celebration-card.rarity-epic { border-top-color: #a855f7; }
+.celebration-card.rarity-legendary { border-top-color: #eab308; }
+
+@keyframes pop-in {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.celebration-title {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.celebration-pet {
+  font-size: 4rem;
+  margin-bottom: 8px;
+}
+
+.companion-note {
+  color: #a855f7;
+  font-weight: bold;
+}
+
+.celebration-rewards {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.reward-chip {
+  font-weight: bold;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+}
+
+.reward-chip.money { background: #dcfce7; color: #15803d; }
+.reward-chip.rep { background: #fef3c7; color: #92400e; }
+
+.confetti-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 20px;
+}
+
+.confetti {
+  position: absolute;
+  top: -10%;
+  font-size: 1.4rem;
+  animation: confetti-fall 1.8s ease-in forwards;
+}
+
+@keyframes confetti-fall {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to { transform: translateY(420px) rotate(360deg); opacity: 0; }
 }
