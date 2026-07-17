@@ -2,6 +2,9 @@
 
 One line per shipped change, newest on top.
 
+- 2026-07-17 — feat: `taskboard.html` — a standalone viewer that fetches and renders `docs/TASK_BOARD.md`
+  live (no build step, never cached), with per-bucket filtering, search, and a collapsed-by-default
+  ON HOLD section.
 - 2026-07-17 — feat: Pet HQ trophy room — a new tab showcasing rescued pets by rarity, companions, and a
   photo strip.
 - 2026-07-17 — feat: detective theories & predictions — a free-text notebook field, persisted per active
