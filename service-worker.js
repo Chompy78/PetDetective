@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pawsitive-detectives-v2';
+const CACHE_NAME = 'pawsitive-detectives-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,9 @@ const ASSETS = [
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/favicon-32.png',
+  './icons/favicon-64.png'
 ];
 
 self.addEventListener('install', event => {
