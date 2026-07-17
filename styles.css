@@ -380,6 +380,38 @@ body {
   font-size: 0.85rem;
 }
 
+.theory-box {
+  background: #fff7ed;
+  border: 2px solid #fde2b3;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+
+.theory-box label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.theory-input {
+  width: 100%;
+  min-height: 60px;
+  border: 2px solid #fde2b3;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.theory-saved-note {
+  color: #16a34a;
+  font-weight: bold;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
 .headline-item {
   font-weight: bold;
   font-family: Georgia, 'Times New Roman', serif;
@@ -577,9 +609,17 @@ body {
   .item,
   .log,
   .personality-tip,
-  .photo-chip {
+  .photo-chip,
+  .theory-box {
     background: #241a13;
     color: #f3e8d8;
+    border-color: #4a3626;
+  }
+
+  .theory-input {
+    background: #2a1f18;
+    color: #f3e8d8;
+    border-color: #4a3626;
   }
 
   .pill {

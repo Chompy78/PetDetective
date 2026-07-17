@@ -186,6 +186,15 @@ function stars(n) {
   return '⭐'.repeat(Math.max(1, Math.min(5, n)));
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function fmt(n) {
   return n.toLocaleString();
 }
@@ -334,7 +343,8 @@ function newCase() {
     ...pet,
     owner: OWNERS[state.caseNumber % OWNERS.length],
     reward: pet.rarity === 'Legendary' ? 420 : pet.rarity === 'Epic' ? 280 : pet.rarity === 'Rare' ? 190 : 120,
-    visited: []
+    visited: [],
+    theory: ''
   };
   state.log = `<strong>New case:</strong> ${state.activeCase.owner.name} needs help finding ${pet.icon} ${pet.name} the ${pet.species}. Personality: ${pet.personality}.`;
   state.tab = 'map';
@@ -515,6 +525,15 @@ function closeCelebration() {
   render();
 }
 
+function saveTheory() {
+  if (!state.activeCase) return;
+  const input = document.getElementById('theory-input');
+  if (!input) return;
+  state.activeCase.theory = input.value;
+  saveState();
+  render();
+}
+
 function headerHtml() {
   const repProgress = reputationProgress();
   return `
@@ -638,10 +657,19 @@ function notebookHtml() {
     const meta = CLUE_TYPE_META[type] || CLUE_TYPE_META.note;
     return `<div class="item ${meta.cls}">${meta.icon} ${text}</div>`;
   }).join('') : `<div class="item">No clues yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
+  const theorySection = state.activeCase ? `
+    <div class="theory-box">
+      <label for="theory-input"><b>Your theory:</b></label>
+      <textarea id="theory-input" class="theory-input" placeholder="What do you think is going on?">${escapeHtml(state.activeCase.theory || '')}</textarea>
+      <button class="btn secondary" onclick="saveTheory()">💾 Save theory</button>
+      ${state.activeCase.theory ? '<span class="theory-saved-note">✓ saved</span>' : ''}
+    </div>
+  ` : '<div class="item">Accept a case to start recording your theories.</div>';
   return `
     <section class="card">
       <h2>📓 Detective Notebook</h2>
       <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits. 🔥 fresh · 🕰️ getting old · 🗯️ rumour · ❌ dead end</p>
+      ${theorySection}
       <div class="list">${clues}</div>
       <div class="log" aria-live="polite">${state.log}</div>
     </section>
@@ -847,5 +875,6 @@ window.reloadApp = reloadApp;
 window.exportSave = exportSave;
 window.importSave = importSave;
 window.shareRescue = shareRescue;
+window.saveTheory = saveTheory;
 
 render();

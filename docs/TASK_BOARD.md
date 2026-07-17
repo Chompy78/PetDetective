@@ -12,21 +12,6 @@ _(empty — nothing currently in flight)_
 
 ## 🟡 NEXT
 
-## Detective theories & predictions — TODO
-Branch `feat/detective-theories`. Add a free-text notebook field where the player records their own
-theory/prediction before investigating; persist it per active case.
-**Effort:** medium · **Risk:** low — additive `state` field, no branching game logic, no ambiguity on shape.
-
-```text
-- Add a textarea + "Save theory" control to the Notebook tab.
-- Store as `state.activeCase.theory` (string), cleared on `newCase()`.
-- Display the saved theory back at the top of the Notebook tab.
-- No SAVE_KEY bump needed — additive field, `loadState`'s spread-merge already defaults it.
-```
-
-**Done when:** a player can type and save a theory mid-case, it persists across a page reload, and clears
-when a new case starts.
-
 ## Pet HQ trophy room — TODO
 Branch `feat/trophy-room`. New display combining rescued cards, photos, and companions into one "HQ
 display room" view distinct from the working Collection tab.

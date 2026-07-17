@@ -11,6 +11,19 @@ Architectural/process decisions and the *why* behind them. Format:
 **Status:** Active | Superseded by D-...
 ```
 
+## D-2026-07-17-detective-theories — Escape player-entered theory text before rendering
+**Context:** The detective-theories task adds the first free-text player input in the codebase (`state.
+activeCase.theory`) that gets interpolated into `innerHTML` via `render()`'s `*Html()` functions — every
+other dynamic string in the game is developer-authored. `AGENTS.md`'s hard rules already flag unescaped
+innerHTML interpolation as a risk once player-generated text is involved.
+**Options:** (1) Interpolate the raw value — rejected, since typing `<`/`>`/`&` would corrupt the
+`<textarea>`'s own markup, not just a theoretical security concern; (2) escape it at render time.
+**Decision:** Added an `escapeHtml()` helper and apply it to `state.activeCase.theory` wherever it's
+rendered.
+**Why:** Fixes a real, easily-triggered rendering bug (not just a hypothetical one) and establishes the
+pattern to reuse for any future free-text player input (e.g. a custom agency name).
+**Status:** Active
+
 ## D-2026-07-17-on-hold-bucket — Add an ⏸️ ON HOLD bucket to the task board
 **Context:** A batch of 60 brainstormed ideas needed to be captured on `docs/TASK_BOARD.md` without being
 eligible for automatic pickup by `/pick-task` or `/sweep-tasks` — most are speculative, unscoped, or
