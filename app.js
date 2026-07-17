@@ -60,6 +60,12 @@ const PERSONALITY_TIPS = {
   'Royal': 'Elegant and particular — check the library, plaza or a grand house.'
 };
 
+const NO_SIGN_TEMPLATES = [
+  (pet, loc, locInfo) => `No sign of ${pet.name} at ${loc}, but this place has ${locInfo.clue}. Think about whether that fits a ${pet.personality.toLowerCase()} pet.`,
+  (pet, loc, locInfo) => `Nothing here at ${loc} except ${locInfo.clue}. Does that suit a ${pet.personality.toLowerCase()} pet like ${pet.name}?`,
+  (pet, loc, locInfo) => `${loc} is quiet today — just ${locInfo.clue}. Doesn't seem like the kind of place a ${pet.personality.toLowerCase()} pet would choose... or does it?`
+];
+
 const REPUTATION_TIERS = [
   { name: 'Junior Detective', min: 0 },
   { name: 'Local Detective', min: 100 },
@@ -103,11 +109,29 @@ const defaultState = {
   seenAgencyLevel: 0,
   celebration: null,
   tutorialDismissed: false,
-  soundOn: true
+  soundOn: true,
+  totalEarned: 0
 };
 
 let state = loadState();
 const app = document.getElementById('app');
+let deferredInstallPrompt = null;
+let canInstall = false;
+let updateAvailable = false;
+
+function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.finally(() => {
+    deferredInstallPrompt = null;
+    canInstall = false;
+    render();
+  });
+}
+
+function reloadApp() {
+  window.location.reload();
+}
 
 function loadState() {
   try {
@@ -128,6 +152,14 @@ function locationName(id) {
 
 function stars(n) {
   return '⭐'.repeat(Math.max(1, Math.min(5, n)));
+}
+
+function fmt(n) {
+  return n.toLocaleString();
+}
+
+function companionIcon(name) {
+  return PET_BLUEPRINTS.find(p => p.name === name)?.icon || '🐾';
 }
 
 function rarityClass(rarity) {
@@ -174,14 +206,14 @@ function reputationProgress() {
   if (!next) return { pct: 100, label: `${current.name} — top rank reached!` };
   const span = next.min - current.min;
   const pct = Math.min(100, Math.round(((r - current.min) / span) * 100));
-  return { pct, label: `${r - current.min}/${span} Rep to ${next.name}` };
+  return { pct, label: `${fmt(r - current.min)}/${fmt(span)} Rep to ${next.name}` };
 }
 
 function agencyProgress() {
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   if (!next) return { pct: 100, label: 'Agency fully upgraded!' };
   const pct = Math.min(100, Math.round((state.money / next.cost) * 100));
-  return { pct, label: `$${state.money} / $${next.cost} for ${next.name}` };
+  return { pct, label: `$${fmt(state.money)} / $${fmt(next.cost)} for ${next.name}` };
 }
 
 let audioCtx = null;
@@ -211,6 +243,20 @@ function playTone(freq, startTime, duration, volume) {
 function playClickTick() {
   if (!state.soundOn) return;
   try { playTone(520, 0, 0.06, 0.08); } catch {}
+}
+
+function playMissTone() {
+  if (!state.soundOn) return;
+  try { playTone(220, 0, 0.18, 0.08); } catch {}
+}
+
+let lastActionTime = 0;
+
+function tooSoon() {
+  const now = performance.now();
+  if (now - lastActionTime < 250) return true;
+  lastActionTime = now;
+  return false;
 }
 
 function playSuccessChime() {
@@ -265,32 +311,35 @@ function newCase() {
   render();
 }
 
+function clueText(c) {
+  return typeof c === 'string' ? c : c.text;
+}
+
+function addClue(text, type) {
+  const exists = state.clues.some(c => clueText(c) === text);
+  if (!exists) state.clues.unshift({ text, type });
+}
+
 function nextDay() {
-  if (!state.activeCase) return;
+  if (!state.activeCase || tooSoon()) return;
   state.day += 1;
   const current = currentPetLocation();
   state.log = `<strong>New day.</strong> The trail has moved. Newer clues matter more. Current reward bonus: ${stars(safetyRating())}.`;
   if (Math.random() < 0.35) {
-    const clue = `Fresh rumour: a ${state.activeCase.personality.toLowerCase()} pet may be near ${locationName(current)}.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    addClue(`Fresh rumour: a ${state.activeCase.personality.toLowerCase()} pet may be near ${locationName(current)}.`, 'rumour');
   }
   saveState();
   render();
 }
 
 function investigate(id) {
-  if (!state.activeCase) {
-    state.log = 'Accept a case first.';
-    render();
-    return;
-  }
+  if (!state.activeCase || tooSoon()) return;
   const pet = state.activeCase;
   const current = currentPetLocation();
   const loc = locationName(id);
 
   if (!pet.visited) pet.visited = [];
   if (!pet.visited.includes(id)) pet.visited.push(id);
-  playClickTick();
 
   if (id === current) {
     const safety = safetyRating();
@@ -309,6 +358,7 @@ function investigate(id) {
       photo: `${pet.icon} ${pet.name} at ${loc}`
     };
     state.money += reward;
+    state.totalEarned += reward;
     state.reputation += rep;
     state.rescued.push(record);
     state.records.push(`Case ${state.caseNumber}: ${pet.name} the ${pet.species} was found at ${loc} on day ${state.day}. Personality clue: ${pet.personality}.`);
@@ -316,7 +366,7 @@ function investigate(id) {
     if (newCompanion) {
       state.companions.push(pet.name);
     }
-    state.log = `<strong>Case solved!</strong> You found ${pet.icon} ${pet.name} at ${loc}. Reward: <b>$${reward}</b>. Reputation: <b>+${rep}</b>. Card, photo and rescue record unlocked.`;
+    state.log = `<strong>Case solved!</strong> You found ${pet.icon} ${pet.name} at ${loc}. Reward: <b>$${fmt(reward)}</b>. Reputation: <b>+${fmt(rep)}</b>. Card, photo and rescue record unlocked.`;
     state.celebration = {
       icon: pet.icon,
       name: pet.name,
@@ -336,19 +386,23 @@ function investigate(id) {
     const clue = age <= 0
       ? `${pet.name} has a possible fresh trail near ${loc}.`
       : `${pet.name} was seen at ${loc} around day ${seenDay}. That clue is ${age} day${age === 1 ? '' : 's'} old.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    addClue(clue, age <= 0 ? 'fresh' : 'stale');
     state.log = `<strong>Useful clue:</strong> ${clue}`;
+    playClickTick();
   } else {
     const locInfo = LOCATIONS.find(l => l.id === id);
-    const clue = `No sign of ${pet.name} at ${loc}, but this place has ${locInfo.clue}. Think about whether that fits a ${pet.personality.toLowerCase()} pet.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    const template = NO_SIGN_TEMPLATES[Math.floor(Math.random() * NO_SIGN_TEMPLATES.length)];
+    const clue = template(pet, loc, locInfo);
+    addClue(clue, 'dead-end');
     state.log = `<strong>Search result:</strong> ${clue}`;
+    playMissTone();
   }
   saveState();
   render();
 }
 
 function upgradeAgency() {
+  if (tooSoon()) return;
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   if (!next) {
     state.log = 'Your agency is already at the highest level.';
@@ -368,6 +422,47 @@ function resetGame() {
   state = { ...defaultState };
   localStorage.removeItem(SAVE_KEY);
   render();
+}
+
+function exportSave() {
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => {
+      state.log = 'Save code copied to clipboard! Paste it somewhere safe.';
+      render();
+    }).catch(() => {
+      prompt('Copy this save code:', code);
+    });
+  } else {
+    prompt('Copy this save code:', code);
+  }
+}
+
+function importSave() {
+  const code = prompt('Paste your save code:');
+  if (!code) return;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    state = { ...defaultState, ...parsed };
+    saveState();
+    render();
+  } catch {
+    alert('That save code could not be read. Please check it and try again.');
+  }
+}
+
+function shareRescue() {
+  const c = state.celebration;
+  if (!c) return;
+  const text = `I just rescued ${c.icon} ${c.name} the ${c.species} at ${c.foundAt} in Pawsitive Detectives! 🐾🔍 +$${fmt(c.reward)}, +${fmt(c.rep)} Rep!`;
+  if (navigator.share) {
+    navigator.share({ title: 'Pawsitive Detectives', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      state.log = 'Rescue summary copied to clipboard!';
+      render();
+    }).catch(() => {});
+  }
 }
 
 function setTab(tab) {
@@ -393,12 +488,13 @@ function headerHtml() {
         <p>A cute pet detective agency PWA. Find pets, read clues, build your collection and grow your agency.</p>
       </div>
       <div class="stats">
-        <span class="pill">💰 $${state.money}</span>
-        <span class="pill">🏆 Rep ${state.reputation}</span>
-        <span class="pill">📅 Day ${state.day}</span>
+        <span class="pill">💰 $${fmt(state.money)}</span>
+        <span class="pill">🏆 Rep ${fmt(state.reputation)}</span>
+        <span class="pill">📅 Case Day ${state.day}</span>
         <span class="pill">🎖️ ${caseTier()}</span>
         <span class="pill">🏢 ${AGENCY_LEVELS[state.agencyLevel].name}</span>
         <button class="pill sound-toggle" onclick="toggleSound()" aria-label="${state.soundOn ? 'Mute sound effects' : 'Unmute sound effects'}">${state.soundOn ? '🔊' : '🔇'}</button>
+        ${canInstall ? '<button class="pill sound-toggle" onclick="installApp()">⬇️ Install App</button>' : ''}
       </div>
       <div class="hero-progress-wrap">
         <div class="progress-track hero-progress-track"><div class="progress-fill hero-progress-fill" style="width:${repProgress.pct}%"></div></div>
@@ -419,7 +515,7 @@ function casePanelHtml() {
         <button class="btn good" onclick="newCase()">Accept new case</button>
         <button class="btn purple" onclick="upgradeAgency()">Upgrade agency</button>
         <div class="item">
-          <b>Next upgrade:</b> ${nextLevel ? `${nextLevel.name} — $${nextLevel.cost}` : 'Fully upgraded'}
+          <b>Next upgrade:</b> ${nextLevel ? `${nextLevel.name} — $${fmt(nextLevel.cost)}` : 'Fully upgraded'}
           ${nextLevel ? `<div class="progress-track"><div class="progress-fill" style="width:${progress.pct}%"></div></div><div class="progress-caption">${progress.label}</div>` : ''}
         </div>
         <div class="danger-zone">
@@ -440,7 +536,7 @@ function casePanelHtml() {
         <div class="personality-tip">💡 ${PERSONALITY_TIPS[pet.personality] || 'Follow the clues to learn its habits.'}</div>
         <div><b>Owner:</b> ${pet.owner.name}</div>
         <div class="owner-blurb">${pet.owner.name} ${pet.owner.blurb}.</div>
-        <div><b>Base reward:</b> $${pet.reward}</div>
+        <div><b>Base reward:</b> $${fmt(pet.reward)}</div>
         <div class="safety">
           <div>Reward bonus: ${stars(safetyRating())}</div>
           <div class="safety-hint">${trailCaption(safetyRating())}</div>
@@ -491,12 +587,25 @@ function mapHtml() {
   `;
 }
 
+const CLUE_TYPE_META = {
+  fresh: { icon: '🔥', cls: 'clue-fresh' },
+  stale: { icon: '🕰️', cls: 'clue-stale' },
+  rumour: { icon: '🗯️', cls: 'clue-rumour' },
+  'dead-end': { icon: '❌', cls: 'clue-deadend' },
+  note: { icon: '📝', cls: '' }
+};
+
 function notebookHtml() {
-  const clues = state.clues.length ? state.clues.map(c => `<div class="item">${c}</div>`).join('') : '<div class="item">No clues yet. Visit locations to gather evidence.</div>';
+  const clues = state.clues.length ? state.clues.map(c => {
+    const text = clueText(c);
+    const type = typeof c === 'string' ? 'note' : c.type;
+    const meta = CLUE_TYPE_META[type] || CLUE_TYPE_META.note;
+    return `<div class="item ${meta.cls}">${meta.icon} ${text}</div>`;
+  }).join('') : `<div class="item">No clues yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
   return `
     <section class="card">
       <h2>📓 Detective Notebook</h2>
-      <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits.</p>
+      <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits. 🔥 fresh · 🕰️ getting old · 🗯️ rumour · ❌ dead end</p>
       <div class="list">${clues}</div>
       <div class="log" aria-live="polite">${state.log}</div>
     </section>
@@ -504,7 +613,7 @@ function notebookHtml() {
 }
 
 function collectionHtml() {
-  const cards = state.rescued.length ? state.rescued.map(p => `
+  const cards = state.rescued.length ? [...state.rescued].reverse().map(p => `
     <div class="pet-card">
       <div class="big">${p.icon}</div>
       <b>${p.name}</b>
@@ -512,12 +621,15 @@ function collectionHtml() {
       <span class="rarity-badge ${rarityClass(p.rarity)}">${p.rarity}</span> <span>${p.personality}</span><br>
       <span>Found at ${p.foundAt}</span>
     </div>
-  `).join('') : '<div class="item">No pet cards yet. Solve a case to unlock cards, photos and records.</div>';
+  `).join('') : `<div class="item">No pet cards yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
+  const photos = state.photos.length ? [...state.photos].reverse().map(p => `<div class="photo-chip">${p}</div>`).join('') : '<div class="item">No photos yet.</div>';
   return `
     <section class="card">
       <h2>⭐ Pet Collection</h2>
       <p>Every rescued pet unlocks a card, a photo and a rescue record. Epic and legendary rescues can become companions.</p>
       <div class="collection-grid">${cards}</div>
+      <h3 style="margin-top:16px">📸 Photo Album</h3>
+      <div class="photo-grid">${photos}</div>
     </section>
   `;
 }
@@ -526,12 +638,15 @@ function agencyHtml() {
   const level = AGENCY_LEVELS[state.agencyLevel];
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   const progress = agencyProgress();
+  const companions = state.companions.length
+    ? state.companions.map(name => `<span class="companion-chip">${companionIcon(name)} ${name}</span>`).join('')
+    : 'None yet';
   return `
     <section class="card">
       <h2>🏢 Agency</h2>
       <div class="item"><b>Current HQ:</b> ${level.name}<br><small>${level.desc}</small></div>
       <div class="item"><b>Active case capacity:</b> ${level.activeCases}</div>
-      <div class="item"><b>Companions:</b> ${state.companions.length ? state.companions.join(', ') : 'None yet'}</div>
+      <div class="item"><b>Companions:</b> ${companions}</div>
       ${next ? `
         <div class="item">
           <b>Progress to ${next.name}:</b>
@@ -539,9 +654,21 @@ function agencyHtml() {
           <div class="progress-caption">${progress.label}</div>
         </div>
       ` : ''}
-      <button class="btn purple" onclick="upgradeAgency()">${next ? `Upgrade to ${next.name} — $${next.cost}` : 'Fully upgraded'}</button>
+      <button class="btn purple" onclick="upgradeAgency()">${next ? `Upgrade to ${next.name} — $${fmt(next.cost)}` : 'Fully upgraded'}</button>
+
+      <h3 style="margin-top:16px">📊 Career Stats</h3>
+      <div class="item"><b>Cases attempted:</b> ${fmt(state.caseNumber)}</div>
+      <div class="item"><b>Pets rescued:</b> ${fmt(state.rescued.length)}</div>
+      <div class="item"><b>Lifetime earnings:</b> $${fmt(state.totalEarned)}</div>
+
+      <h3 style="margin-top:16px">💾 Backup & Restore</h3>
+      <div class="actions actions-inline">
+        <button class="btn blue" onclick="exportSave()">📋 Copy save code</button>
+        <button class="btn ghost" onclick="importSave()">📥 Load save code</button>
+      </div>
+
       <h3 style="margin-top:16px">📁 Rescue Records</h3>
-      <div class="list">${state.records.length ? state.records.map(r => `<div class="item">${r}</div>`).join('') : '<div class="item">No rescue records yet.</div>'}</div>
+      <div class="list">${state.records.length ? [...state.records].reverse().map(r => `<div class="item">${r}</div>`).join('') : '<div class="item">No rescue records yet.</div>'}</div>
     </section>
   `;
 }
@@ -554,6 +681,7 @@ function tasksHtml() {
       <ol class="task-list">
         ${DESIGN_TASKS.map(t => `<li>${t}</li>`).join('')}
       </ol>
+      <p class="suggest-link">Got an idea of your own? Add it to <a href="https://github.com/Chompy78/PetDetective/blob/main/TASKS.md" target="_blank" rel="noopener">TASKS.md on GitHub</a>.</p>
     </section>
   `;
 }
@@ -613,24 +741,57 @@ function celebrationHtml() {
         <p>You found <b>${c.name}</b> the ${c.species} at <b>${c.foundAt}</b>!</p>
         ${c.newCompanion ? `<p class="companion-note">🏅 ${c.name} joined your agency as a companion!</p>` : ''}
         <div class="celebration-rewards">
-          <span class="reward-chip money">+$${c.reward}</span>
-          <span class="reward-chip rep">+${c.rep} Rep</span>
+          <span class="reward-chip money">+$${fmt(c.reward)}</span>
+          <span class="reward-chip rep">+${fmt(c.rep)} Rep</span>
         </div>
-        <button class="btn good" onclick="closeCelebration()">Awesome!</button>
+        <div class="celebration-actions">
+          <button class="btn good" onclick="closeCelebration()">Awesome!</button>
+          <button class="btn blue" onclick="shareRescue()">📤 Share</button>
+        </div>
       </div>
     </div>
   `;
 }
 
+function updateBannerHtml() {
+  if (!updateAvailable) return '';
+  return `
+    <div class="update-banner">
+      <span>🔄 A new version of the game is ready.</span>
+      <button class="btn blue" onclick="reloadApp()">Refresh</button>
+    </div>
+  `;
+}
+
 function render() {
-  app.innerHTML = `<div class="app">${headerHtml()}${mainHtml()}<div class="footer">Made as a first playable PWA prototype.</div></div>${celebrationHtml()}`;
+  app.innerHTML = `${updateBannerHtml()}<div class="app">${headerHtml()}${mainHtml()}<div class="footer">Made as a first playable PWA prototype.</div></div>${celebrationHtml()}`;
 }
 
 if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) {
+      updateAvailable = true;
+      render();
+    }
+  });
 }
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  canInstall = true;
+  render();
+});
+
+window.addEventListener('appinstalled', () => {
+  canInstall = false;
+  deferredInstallPrompt = null;
+  render();
+});
 
 window.newCase = newCase;
 window.nextDay = nextDay;
@@ -641,5 +802,10 @@ window.setTab = setTab;
 window.closeCelebration = closeCelebration;
 window.toggleSound = toggleSound;
 window.dismissTutorial = dismissTutorial;
+window.installApp = installApp;
+window.reloadApp = reloadApp;
+window.exportSave = exportSave;
+window.importSave = importSave;
+window.shareRescue = shareRescue;
 
 render();
