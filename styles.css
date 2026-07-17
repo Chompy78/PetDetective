@@ -483,6 +483,12 @@ body {
   font-weight: bold;
 }
 
+.thank-you {
+  font-style: italic;
+  color: #92400e;
+  font-size: 0.9rem;
+}
+
 .celebration-rewards {
   display: flex;
   justify-content: center;
@@ -623,7 +629,8 @@ body {
 
   .footer,
   .suggest-link,
-  .suggest-link a {
+  .suggest-link a,
+  .thank-you {
     color: #d6a35c;
   }
 }

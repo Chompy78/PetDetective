@@ -27,19 +27,6 @@ theory/prediction before investigating; persist it per active case.
 **Done when:** a player can type and save a theory mid-case, it persists across a page reload, and clears
 when a new case starts.
 
-## Rescue thank-you letters — TODO
-Branch `feat/thank-you-letters`. Add a short in-character thank-you note from the owner to the celebration
-modal on solve.
-**Effort:** low · **Risk:** low — pure display addition, reuses existing `OWNERS` data, no new state shape.
-
-```text
-- Add a `thankYou` line generator using `pet.owner.name`/`blurb` + pet name (template strings, similar to
-  NO_SIGN_TEMPLATES).
-- Render it in `celebrationHtml()` under the found-at line.
-```
-
-**Done when:** solving any case shows an owner-specific thank-you line in the celebration modal.
-
 ## Pet HQ trophy room — TODO
 Branch `feat/trophy-room`. New display combining rescued cards, photos, and companions into one "HQ
 display room" view distinct from the working Collection tab.

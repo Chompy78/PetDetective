@@ -60,6 +60,12 @@ const PERSONALITY_TIPS = {
   'Royal': 'Elegant and particular — check the library, plaza or a grand house.'
 };
 
+const THANK_YOU_TEMPLATES = [
+  (owner, pet) => `"Thank you for finding ${pet.name}!" says ${owner.name}, who ${owner.blurb}.`,
+  (owner, pet) => `${owner.name} wipes away a happy tear: "I can't thank you enough for bringing ${pet.name} home."`,
+  (owner, pet) => `"You're a real detective!" ${owner.name} beams, hugging ${pet.name} tight.`
+];
+
 const NO_SIGN_TEMPLATES = [
   (pet, loc, locInfo) => `No sign of ${pet.name} at ${loc}, but this place has ${locInfo.clue}. Think about whether that fits a ${pet.personality.toLowerCase()} pet.`,
   (pet, loc, locInfo) => `Nothing here at ${loc} except ${locInfo.clue}. Does that suit a ${pet.personality.toLowerCase()} pet like ${pet.name}?`,
@@ -367,6 +373,7 @@ function investigate(id) {
       state.companions.push(pet.name);
     }
     state.log = `<strong>Case solved!</strong> You found ${pet.icon} ${pet.name} at ${loc}. Reward: <b>$${fmt(reward)}</b>. Reputation: <b>+${fmt(rep)}</b>. Card, photo and rescue record unlocked.`;
+    const thankYouTemplate = THANK_YOU_TEMPLATES[Math.floor(Math.random() * THANK_YOU_TEMPLATES.length)];
     state.celebration = {
       icon: pet.icon,
       name: pet.name,
@@ -375,7 +382,8 @@ function investigate(id) {
       foundAt: loc,
       reward,
       rep,
-      newCompanion
+      newCompanion,
+      thankYou: thankYouTemplate(pet.owner, pet)
     };
     playSuccessChime();
     state.activeCase = null;
@@ -739,6 +747,7 @@ function celebrationHtml() {
         <div class="celebration-title">🎉 Case Solved!</div>
         <div class="celebration-pet">${c.icon}</div>
         <p>You found <b>${c.name}</b> the ${c.species} at <b>${c.foundAt}</b>!</p>
+        <p class="thank-you">${c.thankYou}</p>
         ${c.newCompanion ? `<p class="companion-note">🏅 ${c.name} joined your agency as a companion!</p>` : ''}
         <div class="celebration-rewards">
           <span class="reward-chip money">+$${fmt(c.reward)}</span>
