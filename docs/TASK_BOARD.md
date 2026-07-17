@@ -31,6 +31,19 @@ the approach); touches core case-generation logic with no test suite.
 **Done when:** a Food Lover pet's generated path visibly favors food-related locations across multiple new
 cases, without breaking existing safety/day mechanics.
 
+**⚠️ Attempted and parked (2026-07-17 sweep):** a literal implementation of the steps above (weight-3-vs-1
+independent daily draws) was built and code-reviewed, then reverted rather than merged. Confirmed problems
+a fix needs to address, not just the weighting scheme itself:
+- No guarantee a generated path includes *any* personality-matching location — `PERSONALITY_TIPS`' advice
+  can be flatly false for a given case.
+- Independent draws (sampling with replacement) let a location repeat across days with no exclusion,
+  contradicting `nextDay()`'s unconditional "The trail has moved" text.
+- `investigate()`'s `pet.path.indexOf(id)` resolves only the *first* occurrence of a repeated location,
+  so a later fresh visit gets misdated as stale — empirically ~52% of paths for a 3-tag personality now
+  contain a duplicate (vs. a handful of the 10 old hand-authored paths).
+A fix needs to guarantee at least one on-personality stop, exclude adjacent (or all) repeats, and fix
+`indexOf` to account for repeats — not just retune the 3:1 weight ratio.
+
 ## Missing-item cases — TODO
 Branch `feat/item-cases`. Add a second case type (stolen toys, buried trophies, lost accessories) alongside
 pet cases.
