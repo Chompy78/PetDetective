@@ -34,6 +34,32 @@ const AGENCY_LEVELS = [
   { name: 'National Agency', cost: 4000, activeCases: 5, desc: 'Legendary mysteries can appear on the case board.' }
 ];
 
+const OWNERS = [
+  { name: 'Mrs Brown', blurb: 'runs the corner bakery and knows every regular by name' },
+  { name: 'Mr Singh', blurb: 'walks the park every morning, rain or shine' },
+  { name: 'Dr Murphy', blurb: 'the town vet who treats every animal like family' },
+  { name: 'Aunty Jo', blurb: 'grows prize tomatoes and gossips over the garden fence' },
+  { name: 'Ranger Bob', blurb: 'keeps an eye on the forest trails and river paths' },
+  { name: 'Miss Nguyen', blurb: 'teaches at the school and always has treats in her bag' },
+  { name: 'Old Man Rossi', blurb: 'has lived by the plaza fountain for forty years' },
+  { name: 'Captain Reyes', blurb: 'runs beach patrol and knows every tide pool' },
+  { name: 'Ms Okafor', blurb: 'owns the pet shop and spoils every customer\'s pet' },
+  { name: 'The Whitfields', blurb: 'a big family from the houses near the market' }
+];
+
+const PERSONALITY_TIPS = {
+  'Food Lover': 'Follows its stomach — check bakeries, markets and kitchens first.',
+  'Shy': 'Prefers quiet spots like the library, forest or a cosy garden.',
+  'Social Butterfly': 'Loves a crowd — try the plaza, school or market.',
+  'Hide-and-Seek Champion': 'Tricky to track — quiet corners and homes are worth checking twice.',
+  'Water Chaser': 'Follows the water — river, beach and ponds are good bets.',
+  'Collector': 'Gathers things — pet shops, markets and libraries attract it.',
+  'Attention Seeker': 'Loves a stage — try the plaza and school.',
+  'Warmth Seeker': 'Seeks cosy warm spots — bakeries and vets are common hideouts.',
+  'Champion': 'Show-trained — expect it near homes, the plaza or the vet.',
+  'Royal': 'Elegant and particular — check the library, plaza or a grand house.'
+};
+
 const REPUTATION_TIERS = [
   { name: 'Junior Detective', min: 0 },
   { name: 'Local Detective', min: 100 },
@@ -75,7 +101,9 @@ const defaultState = {
   lastPetName: null,
   seenCollectionCount: 0,
   seenAgencyLevel: 0,
-  celebration: null
+  celebration: null,
+  tutorialDismissed: false,
+  soundOn: true
 };
 
 let state = loadState();
@@ -116,6 +144,17 @@ function safetyRating() {
   return Math.max(1, 6 - state.day);
 }
 
+function trailCaption(safety) {
+  const captions = {
+    5: 'Fresh trail — the reward bonus is at its best right now!',
+    4: 'Still a strong trail. Good time to keep searching.',
+    3: "The trail's getting older. The bonus is shrinking.",
+    2: 'Trail is going cold. Move fast for what bonus is left.',
+    1: 'Trail is very cold — reward bonus is down to the minimum.'
+  };
+  return captions[safety] || captions[1];
+}
+
 function caseTier() {
   let name = REPUTATION_TIERS[0].name;
   for (const tier of REPUTATION_TIERS) {
@@ -145,6 +184,56 @@ function agencyProgress() {
   return { pct, label: `$${state.money} / $${next.cost} for ${next.name}` };
 }
 
+let audioCtx = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContextClass();
+  }
+  return audioCtx;
+}
+
+function playTone(freq, startTime, duration, volume) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = freq;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(volume, ctx.currentTime + startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime + startTime);
+  osc.stop(ctx.currentTime + startTime + duration);
+}
+
+function playClickTick() {
+  if (!state.soundOn) return;
+  try { playTone(520, 0, 0.06, 0.08); } catch {}
+}
+
+function playSuccessChime() {
+  if (!state.soundOn) return;
+  try {
+    playTone(523.25, 0, 0.15, 0.15);
+    playTone(659.25, 0.12, 0.15, 0.15);
+    playTone(783.99, 0.24, 0.25, 0.15);
+  } catch {}
+}
+
+function toggleSound() {
+  state.soundOn = !state.soundOn;
+  saveState();
+  render();
+}
+
+function dismissTutorial() {
+  state.tutorialDismissed = true;
+  saveState();
+  render();
+}
+
 function choosePet() {
   const unlocked = PET_BLUEPRINTS.filter((pet, index) => {
     if (state.reputation < 200) return index < 5;
@@ -165,12 +254,13 @@ function newCase() {
   state.activeCase = {
     id: `${pet.name}-${Date.now()}`,
     ...pet,
-    owner: ['Mrs Brown', 'Mr Singh', 'Dr Murphy', 'Aunty Jo', 'Ranger Bob'][state.caseNumber % 5],
+    owner: OWNERS[state.caseNumber % OWNERS.length],
     reward: pet.rarity === 'Legendary' ? 420 : pet.rarity === 'Epic' ? 280 : pet.rarity === 'Rare' ? 190 : 120,
     visited: []
   };
-  state.log = `<strong>New case:</strong> ${state.activeCase.owner} needs help finding ${pet.icon} ${pet.name} the ${pet.species}. Personality: ${pet.personality}.`;
+  state.log = `<strong>New case:</strong> ${state.activeCase.owner.name} needs help finding ${pet.icon} ${pet.name} the ${pet.species}. Personality: ${pet.personality}.`;
   state.tab = 'map';
+  state.tutorialDismissed = true;
   saveState();
   render();
 }
@@ -200,6 +290,7 @@ function investigate(id) {
 
   if (!pet.visited) pet.visited = [];
   if (!pet.visited.includes(id)) pet.visited.push(id);
+  playClickTick();
 
   if (id === current) {
     const safety = safetyRating();
@@ -236,6 +327,7 @@ function investigate(id) {
       rep,
       newCompanion
     };
+    playSuccessChime();
     state.activeCase = null;
     state.clues = [];
   } else if (pet.path.includes(id)) {
@@ -306,6 +398,7 @@ function headerHtml() {
         <span class="pill">📅 Day ${state.day}</span>
         <span class="pill">🎖️ ${caseTier()}</span>
         <span class="pill">🏢 ${AGENCY_LEVELS[state.agencyLevel].name}</span>
+        <button class="pill sound-toggle" onclick="toggleSound()" aria-label="${state.soundOn ? 'Mute sound effects' : 'Unmute sound effects'}">${state.soundOn ? '🔊' : '🔇'}</button>
       </div>
       <div class="hero-progress-wrap">
         <div class="progress-track hero-progress-track"><div class="progress-fill hero-progress-fill" style="width:${repProgress.pct}%"></div></div>
@@ -325,10 +418,13 @@ function casePanelHtml() {
         <p>No active case. Start a new case to help a lost pet.</p>
         <button class="btn good" onclick="newCase()">Accept new case</button>
         <button class="btn purple" onclick="upgradeAgency()">Upgrade agency</button>
-        <button class="btn ghost" onclick="resetGame()">Reset save</button>
         <div class="item">
           <b>Next upgrade:</b> ${nextLevel ? `${nextLevel.name} — $${nextLevel.cost}` : 'Fully upgraded'}
           ${nextLevel ? `<div class="progress-track"><div class="progress-fill" style="width:${progress.pct}%"></div></div><div class="progress-caption">${progress.label}</div>` : ''}
+        </div>
+        <div class="danger-zone">
+          <div class="danger-zone-label">Danger zone</div>
+          <button class="btn danger" onclick="resetGame()">⚠️ Reset save</button>
         </div>
       </aside>
     `;
@@ -336,16 +432,18 @@ function casePanelHtml() {
   const pet = state.activeCase;
   return `
     <aside class="card case-card">
-      <h2>🔎 Active Case</h2>
+      <h2>🔎 Active Case <span class="case-counter">#${state.caseNumber}</span></h2>
       <div class="case-pet">
         <div class="pet-name">${pet.icon} ${pet.name}</div>
         <div class="pet-meta">${pet.species} • <span class="rarity-badge ${rarityClass(pet.rarity)}">${pet.rarity}</span></div>
         <div><b>Personality:</b> ${pet.personality}</div>
-        <div><b>Owner:</b> ${pet.owner}</div>
+        <div class="personality-tip">💡 ${PERSONALITY_TIPS[pet.personality] || 'Follow the clues to learn its habits.'}</div>
+        <div><b>Owner:</b> ${pet.owner.name}</div>
+        <div class="owner-blurb">${pet.owner.name} ${pet.owner.blurb}.</div>
         <div><b>Base reward:</b> $${pet.reward}</div>
         <div class="safety">
           <div>Reward bonus: ${stars(safetyRating())}</div>
-          <div class="safety-hint">Solve the case quickly for a bigger reward and more reputation!</div>
+          <div class="safety-hint">${trailCaption(safetyRating())}</div>
         </div>
       </div>
       <p>This build uses your preferred difficulty: pets move over days. There is no energy bar, no hard timer and no lives.</p>
@@ -361,13 +459,13 @@ function tabsHtml() {
   const hasNewCollection = state.rescued.length > (state.seenCollectionCount || 0);
   const hasNewAgency = state.agencyLevel > (state.seenAgencyLevel || 0);
   const tabs = [
-    ['map', '🗺️ Map', false],
-    ['notebook', '📓 Notebook', false],
-    ['collection', '⭐ Collection', hasNewCollection],
-    ['agency', '🏢 Agency', hasNewAgency],
-    ['tasks', '✅ Task List', false]
+    ['map', '🗺️ Map', 'Map', false],
+    ['notebook', '📓 Notebook', 'Notebook', false],
+    ['collection', '⭐ Collection', 'Collection', hasNewCollection],
+    ['agency', '🏢 Agency', 'Agency', hasNewAgency],
+    ['tasks', '✅ Task List', 'Task List', false]
   ];
-  return `<div class="tabs">${tabs.map(([id, label, isNew]) => `<button class="tab ${state.tab === id ? 'active' : ''}" onclick="setTab('${id}')">${label}${isNew ? '<span class="tab-dot"></span>' : ''}</button>`).join('')}</div>`;
+  return `<div class="tabs">${tabs.map(([id, label, name, isNew]) => `<button class="tab ${state.tab === id ? 'active' : ''}" onclick="setTab('${id}')" aria-label="${name}${isNew ? ' (new)' : ''}">${label}${isNew ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}</button>`).join('')}</div>`;
 }
 
 function mapHtml() {
@@ -378,17 +476,17 @@ function mapHtml() {
       <p>Click a location to investigate. Older clues may be true but out of date.</p>
       <div class="map-grid">
         ${LOCATIONS.map(l => `
-          <button class="location ${visited.includes(l.id) ? 'visited' : ''}" onclick="investigate('${l.id}')">
+          <button class="location ${visited.includes(l.id) ? 'visited' : ''}" onclick="investigate('${l.id}')" aria-label="${l.name}: ${l.clue}${visited.includes(l.id) ? ' (already checked)' : ''}">
             <div>
               ${visited.includes(l.id) ? '<div class="visited-badge">✓ checked</div>' : ''}
-              <div class="emoji">${l.icon}</div>
+              <div class="emoji" aria-hidden="true">${l.icon}</div>
               <div class="name">${l.name}</div>
               <div class="hint">${l.clue}</div>
             </div>
           </button>
         `).join('')}
       </div>
-      <div class="log">${state.log}</div>
+      <div class="log" aria-live="polite">${state.log}</div>
     </section>
   `;
 }
@@ -400,7 +498,7 @@ function notebookHtml() {
       <h2>📓 Detective Notebook</h2>
       <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits.</p>
       <div class="list">${clues}</div>
-      <div class="log">${state.log}</div>
+      <div class="log" aria-live="polite">${state.log}</div>
     </section>
   `;
 }
@@ -460,6 +558,22 @@ function tasksHtml() {
   `;
 }
 
+function tutorialHtml() {
+  if (state.tutorialDismissed || state.caseNumber > 0) return '';
+  return `
+    <section class="card tutorial-tip">
+      <h2>👋 New to Pawsitive Detectives?</h2>
+      <ol class="task-list">
+        <li>Accept a case from the Case Board.</li>
+        <li>Click locations on the Town Map to investigate.</li>
+        <li>Read your clues in the Notebook and think about the pet's personality.</li>
+        <li>Click the right location to rescue the pet and earn rewards!</li>
+      </ol>
+      <button class="btn ghost" onclick="dismissTutorial()">Got it, thanks!</button>
+    </section>
+  `;
+}
+
 function mainHtml() {
   let content = mapHtml();
   if (state.tab === 'notebook') content = notebookHtml();
@@ -467,6 +581,7 @@ function mainHtml() {
   if (state.tab === 'agency') content = agencyHtml();
   if (state.tab === 'tasks') content = tasksHtml();
   return `
+    ${tutorialHtml()}
     <main class="layout">
       ${casePanelHtml()}
       <div>${tabsHtml()}${content}</div>
@@ -524,5 +639,7 @@ window.upgradeAgency = upgradeAgency;
 window.resetGame = resetGame;
 window.setTab = setTab;
 window.closeCelebration = closeCelebration;
+window.toggleSound = toggleSound;
+window.dismissTutorial = dismissTutorial;
 
 render();
