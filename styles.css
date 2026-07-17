@@ -91,6 +91,12 @@ body {
   white-space: nowrap;
 }
 
+.pill.sound-toggle {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -125,6 +131,28 @@ body {
 
 .pet-meta {
   color: #92400e;
+  margin-bottom: 4px;
+}
+
+.case-counter {
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: #92400e;
+}
+
+.personality-tip {
+  font-size: 0.8rem;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin: 4px 0;
+}
+
+.owner-blurb {
+  font-size: 0.8rem;
+  color: #92400e;
+  font-style: italic;
   margin-bottom: 4px;
 }
 
@@ -181,6 +209,34 @@ body {
 .btn.blue { background: #3b82f6; }
 .btn.secondary { background: #f97316; }
 .btn.ghost { background: #9ca3af; }
+.btn.danger { background: #fff; color: #dc2626; border: 2px solid #dc2626; box-shadow: none; }
+
+.btn-inline {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.actions-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.danger-zone {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #fde2b3;
+}
+
+.danger-zone-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b45309;
+  margin-bottom: 6px;
+}
 
 .tabs {
   display: flex;
@@ -236,6 +292,12 @@ body {
   background: #fff1d6;
 }
 
+.location:active {
+  transform: translateY(2px);
+  border-color: #f59e0b;
+  background: #fff1d6;
+}
+
 .location .emoji {
   font-size: 2rem;
 }
@@ -262,6 +324,11 @@ body {
   color: #16a34a;
   margin-bottom: 2px;
 }
+
+.clue-fresh { border-left: 4px solid #16a34a; }
+.clue-stale { border-left: 4px solid #9ca3af; }
+.clue-rumour { border-left: 4px solid #a855f7; }
+.clue-deadend { border-left: 4px solid #d1d5db; color: #78716c; }
 
 .log {
   background: #fef3c7;
@@ -300,6 +367,30 @@ body {
   font-size: 2.4rem;
 }
 
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo-chip {
+  background: #fef3c7;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.companion-chip {
+  display: inline-block;
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin: 2px 4px 2px 0;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
 .task-list li {
   margin-bottom: 8px;
 }
@@ -316,6 +407,24 @@ body {
   color: #b45309;
   font-size: 0.85rem;
   margin-top: 20px;
+}
+
+.tutorial-tip {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.tutorial-tip h2 {
+  margin-top: 0;
+}
+
+.suggest-link {
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
+.suggest-link a {
+  color: #92400e;
 }
 
 @media (max-width: 720px) {
@@ -391,6 +500,13 @@ body {
 .reward-chip.money { background: #dcfce7; color: #15803d; }
 .reward-chip.rep { background: #fef3c7; color: #92400e; }
 
+.celebration-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .confetti-field {
   position: absolute;
   inset: 0;
@@ -409,4 +525,105 @@ body {
 @keyframes confetti-fall {
   from { transform: translateY(0) rotate(0deg); opacity: 1; }
   to { transform: translateY(420px) rotate(360deg); opacity: 0; }
+}
+
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background: #1d4ed8;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.btn:focus-visible,
+.tab:focus-visible,
+.location:focus-visible,
+.pill.sound-toggle:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #1c1410;
+    color: #f3e8d8;
+  }
+
+  .card {
+    background: #2a1f18;
+    border-color: #4a3626;
+    box-shadow: 0 4px 0 #1c1410;
+  }
+
+  .case-pet,
+  .item,
+  .log,
+  .personality-tip,
+  .photo-chip {
+    background: #241a13;
+    color: #f3e8d8;
+  }
+
+  .pill {
+    background: rgba(0, 0, 0, 0.3);
+    color: #fde2b3;
+  }
+
+  .tab {
+    background: #2a1f18;
+    border-color: #4a3626;
+    color: #fde2b3;
+  }
+
+  .location {
+    background: #241a13;
+    border-color: #4a3626;
+  }
+
+  .location:hover,
+  .location:active {
+    background: #3a2a1c;
+    border-color: #f59e0b;
+  }
+
+  .location.visited {
+    background: #1c1410;
+    border-color: #3a2a1c;
+    opacity: 0.5;
+  }
+
+  .progress-track {
+    background: #4a3626;
+  }
+
+  .btn.danger {
+    background: #2a1f18;
+  }
+
+  .danger-zone {
+    border-top-color: #4a3626;
+  }
+
+  .tutorial-tip {
+    background: #16213a;
+    border-color: #2c4a7a;
+  }
+
+  .celebration-card {
+    background: #2a1f18;
+    color: #f3e8d8;
+  }
+
+  .footer,
+  .suggest-link,
+  .suggest-link a {
+    color: #d6a35c;
+  }
 }

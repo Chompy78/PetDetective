@@ -34,6 +34,38 @@ const AGENCY_LEVELS = [
   { name: 'National Agency', cost: 4000, activeCases: 5, desc: 'Legendary mysteries can appear on the case board.' }
 ];
 
+const OWNERS = [
+  { name: 'Mrs Brown', blurb: 'runs the corner bakery and knows every regular by name' },
+  { name: 'Mr Singh', blurb: 'walks the park every morning, rain or shine' },
+  { name: 'Dr Murphy', blurb: 'the town vet who treats every animal like family' },
+  { name: 'Aunty Jo', blurb: 'grows prize tomatoes and gossips over the garden fence' },
+  { name: 'Ranger Bob', blurb: 'keeps an eye on the forest trails and river paths' },
+  { name: 'Miss Nguyen', blurb: 'teaches at the school and always has treats in her bag' },
+  { name: 'Old Man Rossi', blurb: 'has lived by the plaza fountain for forty years' },
+  { name: 'Captain Reyes', blurb: 'runs beach patrol and knows every tide pool' },
+  { name: 'Ms Okafor', blurb: 'owns the pet shop and spoils every customer\'s pet' },
+  { name: 'The Whitfields', blurb: 'a big family from the houses near the market' }
+];
+
+const PERSONALITY_TIPS = {
+  'Food Lover': 'Follows its stomach — check bakeries, markets and kitchens first.',
+  'Shy': 'Prefers quiet spots like the library, forest or a cosy garden.',
+  'Social Butterfly': 'Loves a crowd — try the plaza, school or market.',
+  'Hide-and-Seek Champion': 'Tricky to track — quiet corners and homes are worth checking twice.',
+  'Water Chaser': 'Follows the water — river, beach and ponds are good bets.',
+  'Collector': 'Gathers things — pet shops, markets and libraries attract it.',
+  'Attention Seeker': 'Loves a stage — try the plaza and school.',
+  'Warmth Seeker': 'Seeks cosy warm spots — bakeries and vets are common hideouts.',
+  'Champion': 'Show-trained — expect it near homes, the plaza or the vet.',
+  'Royal': 'Elegant and particular — check the library, plaza or a grand house.'
+};
+
+const NO_SIGN_TEMPLATES = [
+  (pet, loc, locInfo) => `No sign of ${pet.name} at ${loc}, but this place has ${locInfo.clue}. Think about whether that fits a ${pet.personality.toLowerCase()} pet.`,
+  (pet, loc, locInfo) => `Nothing here at ${loc} except ${locInfo.clue}. Does that suit a ${pet.personality.toLowerCase()} pet like ${pet.name}?`,
+  (pet, loc, locInfo) => `${loc} is quiet today — just ${locInfo.clue}. Doesn't seem like the kind of place a ${pet.personality.toLowerCase()} pet would choose... or does it?`
+];
+
 const REPUTATION_TIERS = [
   { name: 'Junior Detective', min: 0 },
   { name: 'Local Detective', min: 100 },
@@ -75,11 +107,31 @@ const defaultState = {
   lastPetName: null,
   seenCollectionCount: 0,
   seenAgencyLevel: 0,
-  celebration: null
+  celebration: null,
+  tutorialDismissed: false,
+  soundOn: true,
+  totalEarned: 0
 };
 
 let state = loadState();
 const app = document.getElementById('app');
+let deferredInstallPrompt = null;
+let canInstall = false;
+let updateAvailable = false;
+
+function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.finally(() => {
+    deferredInstallPrompt = null;
+    canInstall = false;
+    render();
+  });
+}
+
+function reloadApp() {
+  window.location.reload();
+}
 
 function loadState() {
   try {
@@ -102,6 +154,14 @@ function stars(n) {
   return '⭐'.repeat(Math.max(1, Math.min(5, n)));
 }
 
+function fmt(n) {
+  return n.toLocaleString();
+}
+
+function companionIcon(name) {
+  return PET_BLUEPRINTS.find(p => p.name === name)?.icon || '🐾';
+}
+
 function rarityClass(rarity) {
   return `rarity-${(rarity || '').toLowerCase()}`;
 }
@@ -114,6 +174,17 @@ function currentPetLocation() {
 
 function safetyRating() {
   return Math.max(1, 6 - state.day);
+}
+
+function trailCaption(safety) {
+  const captions = {
+    5: 'Fresh trail — the reward bonus is at its best right now!',
+    4: 'Still a strong trail. Good time to keep searching.',
+    3: "The trail's getting older. The bonus is shrinking.",
+    2: 'Trail is going cold. Move fast for what bonus is left.',
+    1: 'Trail is very cold — reward bonus is down to the minimum.'
+  };
+  return captions[safety] || captions[1];
 }
 
 function caseTier() {
@@ -135,14 +206,78 @@ function reputationProgress() {
   if (!next) return { pct: 100, label: `${current.name} — top rank reached!` };
   const span = next.min - current.min;
   const pct = Math.min(100, Math.round(((r - current.min) / span) * 100));
-  return { pct, label: `${r - current.min}/${span} Rep to ${next.name}` };
+  return { pct, label: `${fmt(r - current.min)}/${fmt(span)} Rep to ${next.name}` };
 }
 
 function agencyProgress() {
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   if (!next) return { pct: 100, label: 'Agency fully upgraded!' };
   const pct = Math.min(100, Math.round((state.money / next.cost) * 100));
-  return { pct, label: `$${state.money} / $${next.cost} for ${next.name}` };
+  return { pct, label: `$${fmt(state.money)} / $${fmt(next.cost)} for ${next.name}` };
+}
+
+let audioCtx = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContextClass();
+  }
+  return audioCtx;
+}
+
+function playTone(freq, startTime, duration, volume) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = freq;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(volume, ctx.currentTime + startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime + startTime);
+  osc.stop(ctx.currentTime + startTime + duration);
+}
+
+function playClickTick() {
+  if (!state.soundOn) return;
+  try { playTone(520, 0, 0.06, 0.08); } catch {}
+}
+
+function playMissTone() {
+  if (!state.soundOn) return;
+  try { playTone(220, 0, 0.18, 0.08); } catch {}
+}
+
+let lastActionTime = 0;
+
+function tooSoon() {
+  const now = performance.now();
+  if (now - lastActionTime < 250) return true;
+  lastActionTime = now;
+  return false;
+}
+
+function playSuccessChime() {
+  if (!state.soundOn) return;
+  try {
+    playTone(523.25, 0, 0.15, 0.15);
+    playTone(659.25, 0.12, 0.15, 0.15);
+    playTone(783.99, 0.24, 0.25, 0.15);
+  } catch {}
+}
+
+function toggleSound() {
+  state.soundOn = !state.soundOn;
+  saveState();
+  render();
+}
+
+function dismissTutorial() {
+  state.tutorialDismissed = true;
+  saveState();
+  render();
 }
 
 function choosePet() {
@@ -165,35 +300,40 @@ function newCase() {
   state.activeCase = {
     id: `${pet.name}-${Date.now()}`,
     ...pet,
-    owner: ['Mrs Brown', 'Mr Singh', 'Dr Murphy', 'Aunty Jo', 'Ranger Bob'][state.caseNumber % 5],
+    owner: OWNERS[state.caseNumber % OWNERS.length],
     reward: pet.rarity === 'Legendary' ? 420 : pet.rarity === 'Epic' ? 280 : pet.rarity === 'Rare' ? 190 : 120,
     visited: []
   };
-  state.log = `<strong>New case:</strong> ${state.activeCase.owner} needs help finding ${pet.icon} ${pet.name} the ${pet.species}. Personality: ${pet.personality}.`;
+  state.log = `<strong>New case:</strong> ${state.activeCase.owner.name} needs help finding ${pet.icon} ${pet.name} the ${pet.species}. Personality: ${pet.personality}.`;
   state.tab = 'map';
+  state.tutorialDismissed = true;
   saveState();
   render();
 }
 
+function clueText(c) {
+  return typeof c === 'string' ? c : c.text;
+}
+
+function addClue(text, type) {
+  const exists = state.clues.some(c => clueText(c) === text);
+  if (!exists) state.clues.unshift({ text, type });
+}
+
 function nextDay() {
-  if (!state.activeCase) return;
+  if (!state.activeCase || tooSoon()) return;
   state.day += 1;
   const current = currentPetLocation();
   state.log = `<strong>New day.</strong> The trail has moved. Newer clues matter more. Current reward bonus: ${stars(safetyRating())}.`;
   if (Math.random() < 0.35) {
-    const clue = `Fresh rumour: a ${state.activeCase.personality.toLowerCase()} pet may be near ${locationName(current)}.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    addClue(`Fresh rumour: a ${state.activeCase.personality.toLowerCase()} pet may be near ${locationName(current)}.`, 'rumour');
   }
   saveState();
   render();
 }
 
 function investigate(id) {
-  if (!state.activeCase) {
-    state.log = 'Accept a case first.';
-    render();
-    return;
-  }
+  if (!state.activeCase || tooSoon()) return;
   const pet = state.activeCase;
   const current = currentPetLocation();
   const loc = locationName(id);
@@ -218,6 +358,7 @@ function investigate(id) {
       photo: `${pet.icon} ${pet.name} at ${loc}`
     };
     state.money += reward;
+    state.totalEarned += reward;
     state.reputation += rep;
     state.rescued.push(record);
     state.records.push(`Case ${state.caseNumber}: ${pet.name} the ${pet.species} was found at ${loc} on day ${state.day}. Personality clue: ${pet.personality}.`);
@@ -225,7 +366,7 @@ function investigate(id) {
     if (newCompanion) {
       state.companions.push(pet.name);
     }
-    state.log = `<strong>Case solved!</strong> You found ${pet.icon} ${pet.name} at ${loc}. Reward: <b>$${reward}</b>. Reputation: <b>+${rep}</b>. Card, photo and rescue record unlocked.`;
+    state.log = `<strong>Case solved!</strong> You found ${pet.icon} ${pet.name} at ${loc}. Reward: <b>$${fmt(reward)}</b>. Reputation: <b>+${fmt(rep)}</b>. Card, photo and rescue record unlocked.`;
     state.celebration = {
       icon: pet.icon,
       name: pet.name,
@@ -236,6 +377,7 @@ function investigate(id) {
       rep,
       newCompanion
     };
+    playSuccessChime();
     state.activeCase = null;
     state.clues = [];
   } else if (pet.path.includes(id)) {
@@ -244,19 +386,23 @@ function investigate(id) {
     const clue = age <= 0
       ? `${pet.name} has a possible fresh trail near ${loc}.`
       : `${pet.name} was seen at ${loc} around day ${seenDay}. That clue is ${age} day${age === 1 ? '' : 's'} old.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    addClue(clue, age <= 0 ? 'fresh' : 'stale');
     state.log = `<strong>Useful clue:</strong> ${clue}`;
+    playClickTick();
   } else {
     const locInfo = LOCATIONS.find(l => l.id === id);
-    const clue = `No sign of ${pet.name} at ${loc}, but this place has ${locInfo.clue}. Think about whether that fits a ${pet.personality.toLowerCase()} pet.`;
-    if (!state.clues.includes(clue)) state.clues.unshift(clue);
+    const template = NO_SIGN_TEMPLATES[Math.floor(Math.random() * NO_SIGN_TEMPLATES.length)];
+    const clue = template(pet, loc, locInfo);
+    addClue(clue, 'dead-end');
     state.log = `<strong>Search result:</strong> ${clue}`;
+    playMissTone();
   }
   saveState();
   render();
 }
 
 function upgradeAgency() {
+  if (tooSoon()) return;
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   if (!next) {
     state.log = 'Your agency is already at the highest level.';
@@ -276,6 +422,47 @@ function resetGame() {
   state = { ...defaultState };
   localStorage.removeItem(SAVE_KEY);
   render();
+}
+
+function exportSave() {
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => {
+      state.log = 'Save code copied to clipboard! Paste it somewhere safe.';
+      render();
+    }).catch(() => {
+      prompt('Copy this save code:', code);
+    });
+  } else {
+    prompt('Copy this save code:', code);
+  }
+}
+
+function importSave() {
+  const code = prompt('Paste your save code:');
+  if (!code) return;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    state = { ...defaultState, ...parsed };
+    saveState();
+    render();
+  } catch {
+    alert('That save code could not be read. Please check it and try again.');
+  }
+}
+
+function shareRescue() {
+  const c = state.celebration;
+  if (!c) return;
+  const text = `I just rescued ${c.icon} ${c.name} the ${c.species} at ${c.foundAt} in Pawsitive Detectives! 🐾🔍 +$${fmt(c.reward)}, +${fmt(c.rep)} Rep!`;
+  if (navigator.share) {
+    navigator.share({ title: 'Pawsitive Detectives', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      state.log = 'Rescue summary copied to clipboard!';
+      render();
+    }).catch(() => {});
+  }
 }
 
 function setTab(tab) {
@@ -301,11 +488,13 @@ function headerHtml() {
         <p>A cute pet detective agency PWA. Find pets, read clues, build your collection and grow your agency.</p>
       </div>
       <div class="stats">
-        <span class="pill">💰 $${state.money}</span>
-        <span class="pill">🏆 Rep ${state.reputation}</span>
-        <span class="pill">📅 Day ${state.day}</span>
+        <span class="pill">💰 $${fmt(state.money)}</span>
+        <span class="pill">🏆 Rep ${fmt(state.reputation)}</span>
+        <span class="pill">📅 Case Day ${state.day}</span>
         <span class="pill">🎖️ ${caseTier()}</span>
         <span class="pill">🏢 ${AGENCY_LEVELS[state.agencyLevel].name}</span>
+        <button class="pill sound-toggle" onclick="toggleSound()" aria-label="${state.soundOn ? 'Mute sound effects' : 'Unmute sound effects'}">${state.soundOn ? '🔊' : '🔇'}</button>
+        ${canInstall ? '<button class="pill sound-toggle" onclick="installApp()">⬇️ Install App</button>' : ''}
       </div>
       <div class="hero-progress-wrap">
         <div class="progress-track hero-progress-track"><div class="progress-fill hero-progress-fill" style="width:${repProgress.pct}%"></div></div>
@@ -325,10 +514,13 @@ function casePanelHtml() {
         <p>No active case. Start a new case to help a lost pet.</p>
         <button class="btn good" onclick="newCase()">Accept new case</button>
         <button class="btn purple" onclick="upgradeAgency()">Upgrade agency</button>
-        <button class="btn ghost" onclick="resetGame()">Reset save</button>
         <div class="item">
-          <b>Next upgrade:</b> ${nextLevel ? `${nextLevel.name} — $${nextLevel.cost}` : 'Fully upgraded'}
+          <b>Next upgrade:</b> ${nextLevel ? `${nextLevel.name} — $${fmt(nextLevel.cost)}` : 'Fully upgraded'}
           ${nextLevel ? `<div class="progress-track"><div class="progress-fill" style="width:${progress.pct}%"></div></div><div class="progress-caption">${progress.label}</div>` : ''}
+        </div>
+        <div class="danger-zone">
+          <div class="danger-zone-label">Danger zone</div>
+          <button class="btn danger" onclick="resetGame()">⚠️ Reset save</button>
         </div>
       </aside>
     `;
@@ -336,16 +528,18 @@ function casePanelHtml() {
   const pet = state.activeCase;
   return `
     <aside class="card case-card">
-      <h2>🔎 Active Case</h2>
+      <h2>🔎 Active Case <span class="case-counter">#${state.caseNumber}</span></h2>
       <div class="case-pet">
         <div class="pet-name">${pet.icon} ${pet.name}</div>
         <div class="pet-meta">${pet.species} • <span class="rarity-badge ${rarityClass(pet.rarity)}">${pet.rarity}</span></div>
         <div><b>Personality:</b> ${pet.personality}</div>
-        <div><b>Owner:</b> ${pet.owner}</div>
-        <div><b>Base reward:</b> $${pet.reward}</div>
+        <div class="personality-tip">💡 ${PERSONALITY_TIPS[pet.personality] || 'Follow the clues to learn its habits.'}</div>
+        <div><b>Owner:</b> ${pet.owner.name}</div>
+        <div class="owner-blurb">${pet.owner.name} ${pet.owner.blurb}.</div>
+        <div><b>Base reward:</b> $${fmt(pet.reward)}</div>
         <div class="safety">
           <div>Reward bonus: ${stars(safetyRating())}</div>
-          <div class="safety-hint">Solve the case quickly for a bigger reward and more reputation!</div>
+          <div class="safety-hint">${trailCaption(safetyRating())}</div>
         </div>
       </div>
       <p>This build uses your preferred difficulty: pets move over days. There is no energy bar, no hard timer and no lives.</p>
@@ -361,13 +555,13 @@ function tabsHtml() {
   const hasNewCollection = state.rescued.length > (state.seenCollectionCount || 0);
   const hasNewAgency = state.agencyLevel > (state.seenAgencyLevel || 0);
   const tabs = [
-    ['map', '🗺️ Map', false],
-    ['notebook', '📓 Notebook', false],
-    ['collection', '⭐ Collection', hasNewCollection],
-    ['agency', '🏢 Agency', hasNewAgency],
-    ['tasks', '✅ Task List', false]
+    ['map', '🗺️ Map', 'Map', false],
+    ['notebook', '📓 Notebook', 'Notebook', false],
+    ['collection', '⭐ Collection', 'Collection', hasNewCollection],
+    ['agency', '🏢 Agency', 'Agency', hasNewAgency],
+    ['tasks', '✅ Task List', 'Task List', false]
   ];
-  return `<div class="tabs">${tabs.map(([id, label, isNew]) => `<button class="tab ${state.tab === id ? 'active' : ''}" onclick="setTab('${id}')">${label}${isNew ? '<span class="tab-dot"></span>' : ''}</button>`).join('')}</div>`;
+  return `<div class="tabs">${tabs.map(([id, label, name, isNew]) => `<button class="tab ${state.tab === id ? 'active' : ''}" onclick="setTab('${id}')" aria-label="${name}${isNew ? ' (new)' : ''}">${label}${isNew ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}</button>`).join('')}</div>`;
 }
 
 function mapHtml() {
@@ -378,35 +572,48 @@ function mapHtml() {
       <p>Click a location to investigate. Older clues may be true but out of date.</p>
       <div class="map-grid">
         ${LOCATIONS.map(l => `
-          <button class="location ${visited.includes(l.id) ? 'visited' : ''}" onclick="investigate('${l.id}')">
+          <button class="location ${visited.includes(l.id) ? 'visited' : ''}" onclick="investigate('${l.id}')" aria-label="${l.name}: ${l.clue}${visited.includes(l.id) ? ' (already checked)' : ''}">
             <div>
               ${visited.includes(l.id) ? '<div class="visited-badge">✓ checked</div>' : ''}
-              <div class="emoji">${l.icon}</div>
+              <div class="emoji" aria-hidden="true">${l.icon}</div>
               <div class="name">${l.name}</div>
               <div class="hint">${l.clue}</div>
             </div>
           </button>
         `).join('')}
       </div>
-      <div class="log">${state.log}</div>
+      <div class="log" aria-live="polite">${state.log}</div>
     </section>
   `;
 }
 
+const CLUE_TYPE_META = {
+  fresh: { icon: '🔥', cls: 'clue-fresh' },
+  stale: { icon: '🕰️', cls: 'clue-stale' },
+  rumour: { icon: '🗯️', cls: 'clue-rumour' },
+  'dead-end': { icon: '❌', cls: 'clue-deadend' },
+  note: { icon: '📝', cls: '' }
+};
+
 function notebookHtml() {
-  const clues = state.clues.length ? state.clues.map(c => `<div class="item">${c}</div>`).join('') : '<div class="item">No clues yet. Visit locations to gather evidence.</div>';
+  const clues = state.clues.length ? state.clues.map(c => {
+    const text = clueText(c);
+    const type = typeof c === 'string' ? 'note' : c.type;
+    const meta = CLUE_TYPE_META[type] || CLUE_TYPE_META.note;
+    return `<div class="item ${meta.cls}">${meta.icon} ${text}</div>`;
+  }).join('') : `<div class="item">No clues yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
   return `
     <section class="card">
       <h2>📓 Detective Notebook</h2>
-      <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits.</p>
+      <p>Difficulty comes from reading clues and predicting pet movement, not from energy limits. 🔥 fresh · 🕰️ getting old · 🗯️ rumour · ❌ dead end</p>
       <div class="list">${clues}</div>
-      <div class="log">${state.log}</div>
+      <div class="log" aria-live="polite">${state.log}</div>
     </section>
   `;
 }
 
 function collectionHtml() {
-  const cards = state.rescued.length ? state.rescued.map(p => `
+  const cards = state.rescued.length ? [...state.rescued].reverse().map(p => `
     <div class="pet-card">
       <div class="big">${p.icon}</div>
       <b>${p.name}</b>
@@ -414,12 +621,15 @@ function collectionHtml() {
       <span class="rarity-badge ${rarityClass(p.rarity)}">${p.rarity}</span> <span>${p.personality}</span><br>
       <span>Found at ${p.foundAt}</span>
     </div>
-  `).join('') : '<div class="item">No pet cards yet. Solve a case to unlock cards, photos and records.</div>';
+  `).join('') : `<div class="item">No pet cards yet. <button class="btn ghost btn-inline" onclick="setTab('map')">Go investigate →</button></div>`;
+  const photos = state.photos.length ? [...state.photos].reverse().map(p => `<div class="photo-chip">${p}</div>`).join('') : '<div class="item">No photos yet.</div>';
   return `
     <section class="card">
       <h2>⭐ Pet Collection</h2>
       <p>Every rescued pet unlocks a card, a photo and a rescue record. Epic and legendary rescues can become companions.</p>
       <div class="collection-grid">${cards}</div>
+      <h3 style="margin-top:16px">📸 Photo Album</h3>
+      <div class="photo-grid">${photos}</div>
     </section>
   `;
 }
@@ -428,12 +638,15 @@ function agencyHtml() {
   const level = AGENCY_LEVELS[state.agencyLevel];
   const next = AGENCY_LEVELS[state.agencyLevel + 1];
   const progress = agencyProgress();
+  const companions = state.companions.length
+    ? state.companions.map(name => `<span class="companion-chip">${companionIcon(name)} ${name}</span>`).join('')
+    : 'None yet';
   return `
     <section class="card">
       <h2>🏢 Agency</h2>
       <div class="item"><b>Current HQ:</b> ${level.name}<br><small>${level.desc}</small></div>
       <div class="item"><b>Active case capacity:</b> ${level.activeCases}</div>
-      <div class="item"><b>Companions:</b> ${state.companions.length ? state.companions.join(', ') : 'None yet'}</div>
+      <div class="item"><b>Companions:</b> ${companions}</div>
       ${next ? `
         <div class="item">
           <b>Progress to ${next.name}:</b>
@@ -441,9 +654,21 @@ function agencyHtml() {
           <div class="progress-caption">${progress.label}</div>
         </div>
       ` : ''}
-      <button class="btn purple" onclick="upgradeAgency()">${next ? `Upgrade to ${next.name} — $${next.cost}` : 'Fully upgraded'}</button>
+      <button class="btn purple" onclick="upgradeAgency()">${next ? `Upgrade to ${next.name} — $${fmt(next.cost)}` : 'Fully upgraded'}</button>
+
+      <h3 style="margin-top:16px">📊 Career Stats</h3>
+      <div class="item"><b>Cases attempted:</b> ${fmt(state.caseNumber)}</div>
+      <div class="item"><b>Pets rescued:</b> ${fmt(state.rescued.length)}</div>
+      <div class="item"><b>Lifetime earnings:</b> $${fmt(state.totalEarned)}</div>
+
+      <h3 style="margin-top:16px">💾 Backup & Restore</h3>
+      <div class="actions actions-inline">
+        <button class="btn blue" onclick="exportSave()">📋 Copy save code</button>
+        <button class="btn ghost" onclick="importSave()">📥 Load save code</button>
+      </div>
+
       <h3 style="margin-top:16px">📁 Rescue Records</h3>
-      <div class="list">${state.records.length ? state.records.map(r => `<div class="item">${r}</div>`).join('') : '<div class="item">No rescue records yet.</div>'}</div>
+      <div class="list">${state.records.length ? [...state.records].reverse().map(r => `<div class="item">${r}</div>`).join('') : '<div class="item">No rescue records yet.</div>'}</div>
     </section>
   `;
 }
@@ -456,6 +681,23 @@ function tasksHtml() {
       <ol class="task-list">
         ${DESIGN_TASKS.map(t => `<li>${t}</li>`).join('')}
       </ol>
+      <p class="suggest-link">Got an idea of your own? Add it to <a href="https://github.com/Chompy78/PetDetective/blob/main/TASKS.md" target="_blank" rel="noopener">TASKS.md on GitHub</a>.</p>
+    </section>
+  `;
+}
+
+function tutorialHtml() {
+  if (state.tutorialDismissed || state.caseNumber > 0) return '';
+  return `
+    <section class="card tutorial-tip">
+      <h2>👋 New to Pawsitive Detectives?</h2>
+      <ol class="task-list">
+        <li>Accept a case from the Case Board.</li>
+        <li>Click locations on the Town Map to investigate.</li>
+        <li>Read your clues in the Notebook and think about the pet's personality.</li>
+        <li>Click the right location to rescue the pet and earn rewards!</li>
+      </ol>
+      <button class="btn ghost" onclick="dismissTutorial()">Got it, thanks!</button>
     </section>
   `;
 }
@@ -467,6 +709,7 @@ function mainHtml() {
   if (state.tab === 'agency') content = agencyHtml();
   if (state.tab === 'tasks') content = tasksHtml();
   return `
+    ${tutorialHtml()}
     <main class="layout">
       ${casePanelHtml()}
       <div>${tabsHtml()}${content}</div>
@@ -498,24 +741,57 @@ function celebrationHtml() {
         <p>You found <b>${c.name}</b> the ${c.species} at <b>${c.foundAt}</b>!</p>
         ${c.newCompanion ? `<p class="companion-note">🏅 ${c.name} joined your agency as a companion!</p>` : ''}
         <div class="celebration-rewards">
-          <span class="reward-chip money">+$${c.reward}</span>
-          <span class="reward-chip rep">+${c.rep} Rep</span>
+          <span class="reward-chip money">+$${fmt(c.reward)}</span>
+          <span class="reward-chip rep">+${fmt(c.rep)} Rep</span>
         </div>
-        <button class="btn good" onclick="closeCelebration()">Awesome!</button>
+        <div class="celebration-actions">
+          <button class="btn good" onclick="closeCelebration()">Awesome!</button>
+          <button class="btn blue" onclick="shareRescue()">📤 Share</button>
+        </div>
       </div>
     </div>
   `;
 }
 
+function updateBannerHtml() {
+  if (!updateAvailable) return '';
+  return `
+    <div class="update-banner">
+      <span>🔄 A new version of the game is ready.</span>
+      <button class="btn blue" onclick="reloadApp()">Refresh</button>
+    </div>
+  `;
+}
+
 function render() {
-  app.innerHTML = `<div class="app">${headerHtml()}${mainHtml()}<div class="footer">Made as a first playable PWA prototype.</div></div>${celebrationHtml()}`;
+  app.innerHTML = `${updateBannerHtml()}<div class="app">${headerHtml()}${mainHtml()}<div class="footer">Made as a first playable PWA prototype.</div></div>${celebrationHtml()}`;
 }
 
 if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) {
+      updateAvailable = true;
+      render();
+    }
+  });
 }
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  canInstall = true;
+  render();
+});
+
+window.addEventListener('appinstalled', () => {
+  canInstall = false;
+  deferredInstallPrompt = null;
+  render();
+});
 
 window.newCase = newCase;
 window.nextDay = nextDay;
@@ -524,5 +800,12 @@ window.upgradeAgency = upgradeAgency;
 window.resetGame = resetGame;
 window.setTab = setTab;
 window.closeCelebration = closeCelebration;
+window.toggleSound = toggleSound;
+window.dismissTutorial = dismissTutorial;
+window.installApp = installApp;
+window.reloadApp = reloadApp;
+window.exportSave = exportSave;
+window.importSave = importSave;
+window.shareRescue = shareRescue;
 
 render();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pawsitive-detectives-v1';
+const CACHE_NAME = 'pawsitive-detectives-v2';
 const ASSETS = [
   './',
   './index.html',
