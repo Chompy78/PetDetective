@@ -12,7 +12,29 @@ _(empty — nothing currently in flight)_
 
 ## 🟡 NEXT
 
-_(empty — all four caught up in this sweep; see `⏸️ ON HOLD` for more ideas to promote)_
+## Fix: defaultState's mutable fields leak across resetGame()/loadState() — TODO
+Branch `fix/default-state-shared-refs`. Discovered while reviewing the witness-relationship-system attempt
+in the LATER section below, not part of that task's original scope.
+**Effort:** low · **Risk:** medium — touches the save/reset initialization path (a high-risk area per
+`AGENTS.md`), though the fix itself is small and mechanical with no save-data *shape* change.
+
+`defaultState`'s object/array fields (`ownerAffinity`, `rescued`, `records`, `photos`, `headlines`,
+`companions` — `clues` is incidentally safe today only because `newCase()` explicitly reassigns
+`state.clues = []`) are shared references. `state = { ...defaultState }` in `loadState()`, `resetGame()`,
+and `importSave()` only shallow-copies them, so in-place mutations (`.push()`, bracket-assignment) taint
+the shared `defaultState` singleton for the rest of the page's lifetime. Confirmed concretely: solving a
+case, then clicking "Reset save," does **not** actually clear those fields without a full page reload.
+
+```text
+- Replace the module-level `defaultState` object-literal-as-singleton with a `createDefaultState()`
+  factory function that returns a fresh object (fresh `{}`/`[]` literals for every mutable field) on
+  every call.
+- Use `createDefaultState()` everywhere `{ ...defaultState }` / `{ ...defaultState, ...saved }` currently
+  appears: `loadState()`, `resetGame()`, `importSave()`.
+```
+
+**Done when:** solving at least one case (so `rescued`/`records`/`photos`/`headlines` are non-empty),
+then clicking "Reset save" without reloading the page, shows a genuinely clean slate on the very next case.
 
 ## 🟢 LATER
 
@@ -104,6 +126,21 @@ scale clue quality) but the exact clue-quality effect is a design call worth con
 
 **Done when:** solving multiple cases for the same owner visibly improves clue quality/frequency in later
 cases with that owner.
+
+**⚠️ Attempted and parked (2026-07-17 sweep):** built as a bonus-clue-on-newCase() implementation (grant a
+real path stop as a clue once affinity ≥ 2), code-reviewed (medium depth), then reverted rather than
+merged. Two confirmed problems, not just a tuning issue:
+- Since `nextDay()` has no cost, a player can advance a day for free and then click the revealed location
+  directly — once affinity clears the threshold, most future cases with that owner degrade into a
+  near-free solve, undermining the game's own "no shortcuts" design pillar. This isn't specific to
+  revealing `path[1]` vs. `path[0]` — any exact, deterministic location reveal has this problem while
+  `nextDay()` stays free.
+- Separately (see the new bug task below), the mechanic's own state (`ownerAffinity`) exposed a
+  **pre-existing, unrelated bug**: `defaultState`'s mutable fields are shared references, so
+  `resetGame()`/`loadState()` don't actually give a clean slate within the same page session.
+A fix needs a bonus that improves clue *quality* (e.g. reliably tagging a real clue 'fresh', or reducing
+clue noise) without ever handing over a directly-clickable exact answer — and should land after the
+`defaultState` bug below is fixed, not before.
 
 ## Legendary case chains — TODO
 Branch `feat/legendary-case-chains`. Long multi-part mysteries (e.g. "Phantom Pawprints") spanning several
